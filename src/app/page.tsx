@@ -272,6 +272,92 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isPlayerActive]);
 
+  // ── Keyboard Shortcuts (Hotkeys) ──
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
+  const playerStateRef = useRef(playerState);
+  playerStateRef.current = playerState;
+  const lastVolumeRef = useRef(0.5);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in a text field
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "TEXTAREA" ||
+          (target.tagName === "INPUT" && (target as HTMLInputElement).type === "text") ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      switch (e.code) {
+        case "Space": {
+          e.preventDefault();
+          controlsRef.current.togglePlay();
+          break;
+        }
+        case "ArrowRight": {
+          e.preventDefault();
+          controlsRef.current.skipToNext();
+          break;
+        }
+        case "ArrowLeft": {
+          e.preventDefault();
+          controlsRef.current.skipToPrevious();
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          const cur = playerStateRef.current.volume ?? 0.5;
+          const nextVol = Math.min(1, Number((cur + 0.05).toFixed(2)));
+          controlsRef.current.setVolume(nextVol);
+          break;
+        }
+        case "ArrowDown": {
+          e.preventDefault();
+          const cur = playerStateRef.current.volume ?? 0.5;
+          const nextVol = Math.max(0, Number((cur - 0.05).toFixed(2)));
+          controlsRef.current.setVolume(nextVol);
+          break;
+        }
+        case "KeyM": {
+          e.preventDefault();
+          const cur = playerStateRef.current.volume ?? 0.5;
+          if (cur > 0) {
+            lastVolumeRef.current = cur;
+            controlsRef.current.setVolume(0);
+          } else {
+            controlsRef.current.setVolume(lastVolumeRef.current > 0 ? lastVolumeRef.current : 0.5);
+          }
+          break;
+        }
+        case "Digit1": {
+          setMood("chill");
+          break;
+        }
+        case "Digit2": {
+          setMood("energy");
+          break;
+        }
+        case "Digit3": {
+          setMood("focus");
+          break;
+        }
+        case "Digit4": {
+          setMood("neutral");
+          break;
+        }
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // ── Playback timeline binding calculations ──
   const currentPosMs = isPlayerActive ? playerState.positionMs : 0;
 
