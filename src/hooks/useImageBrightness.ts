@@ -16,6 +16,7 @@ export function useImageBrightness(imageUrl: string | null) {
   useEffect(() => {
     if (!imageUrl) return;
 
+    let isCancelled = false;
     const img = new Image();
     img.crossOrigin = "anonymous";
     
@@ -24,10 +25,11 @@ export function useImageBrightness(imageUrl: string | null) {
     };
     
     img.onload = () => {
+      if (isCancelled) return;
       try {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) return;
+        if (!ctx || isCancelled) return;
 
         // Small resolution for extremely fast processing
         canvas.width = 64;
@@ -83,17 +85,23 @@ export function useImageBrightness(imageUrl: string | null) {
         // Region 2: Nav bar (top strip)
         const navLuminance = getRegionLuminance(0, 0, canvas.width, Math.floor(canvas.height * 0.15));
 
-        // Threshold: 128 (midpoint of 0-255)
-        setBrightness({
-          heroIsLight: heroLuminance > 128,
-          navIsLight: navLuminance > 128,
-        });
+        if (!isCancelled) {
+          // Threshold: 128 (midpoint of 0-255)
+          setBrightness({
+            heroIsLight: heroLuminance > 128,
+            navIsLight: navLuminance > 128,
+          });
+        }
       } catch {
         // CORS blocked getImageData. Fail silently.
       }
     };
 
     img.src = imageUrl;
+
+    return () => {
+      isCancelled = true;
+    };
   }, [imageUrl]);
 
   return brightness;

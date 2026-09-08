@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { SpotifyPlayerState, SpotifyPlayerControls } from "@/hooks/useSpotifyPlayer";
 
 export function formatMs(ms: number): string {
@@ -39,6 +39,27 @@ export function PlayerCard({
   // Playback slider dragging state (Moved from page.tsx!)
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const [dragProgressMs, setDragProgressMs] = useState(0);
+  const dragProgressMsRef = useRef(dragProgressMs);
+  dragProgressMsRef.current = dragProgressMs;
+
+  // Global release listener so slider never gets stuck if mouseup occurs outside the slider element
+  useEffect(() => {
+    if (!isDraggingProgress) return;
+    const handleGlobalRelease = () => {
+      setIsDraggingProgress(false);
+      if (isPlayerActive) {
+        controls.seek(dragProgressMsRef.current);
+      }
+    };
+    window.addEventListener("pointerup", handleGlobalRelease);
+    window.addEventListener("mouseup", handleGlobalRelease);
+    window.addEventListener("touchend", handleGlobalRelease);
+    return () => {
+      window.removeEventListener("pointerup", handleGlobalRelease);
+      window.removeEventListener("mouseup", handleGlobalRelease);
+      window.removeEventListener("touchend", handleGlobalRelease);
+    };
+  }, [isDraggingProgress, isPlayerActive, controls]);
 
   // ── Playback slider seek event handlers ──
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
