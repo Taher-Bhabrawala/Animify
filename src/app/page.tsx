@@ -226,6 +226,10 @@ export default function Home() {
 
   // ── Main click handler ──
   const handleMainClick = () => {
+    if (settingsPanelOpen) {
+      setSettingsPanelOpen(false);
+      return;
+    }
     if (isPlayerActive) {
       // Trigger Spotify skip. The `useEffect` above will run the GSAP transition
       // automatically when Spotify confirms the track actually changed.
@@ -241,6 +245,9 @@ export default function Home() {
     e.preventDefault();
     e.stopPropagation();
     if (isLoggedIn) {
+      if (typeof window !== "undefined" && !window.confirm("Are you sure you want to disconnect your Spotify account?")) {
+        return;
+      }
       clearSpotifyAuth();
       setIsLoggedIn(false);
       lastTrackIdRef.current = null;
@@ -515,7 +522,13 @@ export default function Home() {
                   <h1></h1>
                   <h1></h1>
                 </div>
-                <button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isPlayerActive) controls.togglePlay();
+                  }}
+                  aria-label="Listen Now"
+                >
                   Listen Now
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M8 5v14l11-7z" />

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Animify",
-  description: "Animify x Studio",
+  description: "Animify - Dynamic Music Visualizer",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

@@ -4,7 +4,7 @@ import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
-import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
+import type { PlaybackState } from "@/hooks/useSyntheticPulse";
 import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
 
 interface EnergySceneProps {
@@ -110,105 +110,10 @@ interface KineticPlaneProps {
 }
 
 // ──────────────────────────────────────────
-// COMPONENT 1: Synthetic Kinetic Plane (Used for Spotify Mode)
+// Kinetic Plane
 // ──────────────────────────────────────────
 
-function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility }: KineticPlaneProps) {
-  const { width, height } = useThree((s) => s.viewport);
-  const size = useThree((s) => s.size);
-  const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-
-  const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
-  const timeRef = useRef(0);
-  const movementLerpRef = useRef(1.0);
-  const { update: updatePulse } = useSyntheticPulse(120);
-
-  const uniforms = useMemo(
-    () => ({
-      uTexture1: { value: fallbackTex },
-      uTexture2: { value: fallbackTex },
-      uProgress: { value: 0 },
-      uResolution: { value: new THREE.Vector2(1, 1) },
-      uImageRes1: { value: new THREE.Vector2(1, 1) },
-      uImageRes2: { value: new THREE.Vector2(1, 1) },
-      uLayerType: { value: layerType },
-    }),
-    [layerType]
-  );
-
-  useFrame((state, delta) => {
-    const mesh = meshRef.current;
-    const mat = materialRef.current;
-    if (!mesh || !mat) return;
-
-    timeRef.current += delta;
-    const t = timeRef.current;
-
-    mat.uniforms.uResolution.value.set(size.width, size.height);
-    mat.uniforms.uTexture1.value = textures.texture1Ref.current ?? fallbackTex;
-    mat.uniforms.uTexture2.value = textures.texture2Ref.current ?? fallbackTex;
-    mat.uniforms.uProgress.value = textures.progress.value;
-    mat.uniforms.uImageRes1.value.copy(textures.imageRes1);
-    mat.uniforms.uImageRes2.value.copy(textures.imageRes2);
-
-    mouseLerped.current.lerp(mouseTarget.current, 0.08);
-
-    // ── Movement Lerp ──
-    const targetMovement = (accessibility?.layerMovement !== false) ? 1.0 : 0.0;
-    movementLerpRef.current += (targetMovement - movementLerpRef.current) * 0.05;
-    const movement = movementLerpRef.current;
-
-    let floatX = 0;
-    let floatY = 0;
-    if (layerType > 0) {
-      const speed = 0.5;
-      const radius = 0.02;
-      floatX = Math.sin(t * speed + layerType * 2.0) * radius * movement;
-      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius * movement;
-    }
-
-    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
-    const pulse = updatePulse(delta, playbackState || null);
-    const activePulse = (1.0 - transitionPeak) * pulse;
-    
-    const explosionForce = 1.0 + (transitionPeak * 25.0 * movement) + (activePulse * 3.2 * layerType * movement);
-
-    const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
-    const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
-
-    mesh.position.x = (floatX * explosionForce) + parallaxX;
-    mesh.position.y = (floatY * explosionForce) + parallaxY;
-
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * explosionForce;
-    mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2) * movement);
-    mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2) * movement);
-
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType * movement) + (activePulse * 0.042 * layerType * movement);
-    mesh.scale.set(width * scalePulse, height * scalePulse, 1);
-  });
-
-  return (
-    <mesh ref={meshRef} position={[0, 0, zOffset]}>
-      <planeGeometry args={[1, 1, 32, 32]} />
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        blending={layerType === 0 ? THREE.NormalBlending : THREE.AdditiveBlending}
-      />
-    </mesh>
-  );
-}
-
-// ──────────────────────────────────────────
-// COMPONENT 2: Live Kinetic Plane (Used for Local MP3 Mode)
-// ──────────────────────────────────────────
-
-function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: KineticPlaneProps) {
+function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -422,25 +327,12 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 // ──────────────────────────────────────────
 
 export function EnergyScene(props: EnergySceneProps) {
-  const hasLiveAudio = props.playbackState && props.playbackState.getAudioData;
-
   return (
     <>
-      {hasLiveAudio ? (
-        <>
-          <LiveKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <LiveKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <LiveKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <LiveKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-        </>
-      ) : (
-        <>
-          <SyntheticKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <SyntheticKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <SyntheticKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-          <SyntheticKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
-        </>
-      )}
+      <KineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+      <KineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+      <KineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+      <KineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
     </>
   );
 }

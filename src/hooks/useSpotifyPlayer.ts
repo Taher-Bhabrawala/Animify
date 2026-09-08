@@ -131,7 +131,7 @@ export function useSpotifyPlayer(isActive: boolean): {
       if (disposed) return;
 
       const player = new window.Spotify.Player({
-        name: "SpotifyxStudio",
+        name: "Animify",
         getOAuthToken: (cb) => {
           const t = getStoredAccessToken();
           cb(t || "");
