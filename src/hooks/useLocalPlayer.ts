@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { SpotifyPlayerState, SpotifyPlayerControls, SpotifyTrackInfo } from "./useSpotifyPlayer";
+import type { SpotifyPlayerState, SpotifyTrackInfo } from "./useSpotifyPlayer";
 
 export const LOCAL_PLAYLISTS = {
   chill: [
@@ -176,107 +176,54 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus" | "neutral", i
   const cachedAudioDataRef = useRef<AudioReactivityData | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [prevMood, setPrevMood] = useState(mood);
+  if (mood !== prevMood) {
+    setPrevMood(mood);
+    setCurrentIndex(0);
+  }
   const playlist = LOCAL_PLAYLISTS[mood];
   const skipToNextRef = useRef<() => void>(undefined);
 
-  const [state, setState] = useState<SpotifyPlayerState>({
-    currentTrack: null,
-    isPaused: true,
-    positionMs: 0,
+  const [isPaused, setIsPaused] = useState(true);
+  const [positionMs, setPositionMs] = useState(0);
+  const [volume, setVolumeState] = useState(0.5);
+  const [durationMs, setDurationMs] = useState(180000);
+
+  const validIndex = currentIndex < playlist.length ? currentIndex : 0;
+  const trackData = playlist[validIndex];
+  const nextTrackData = playlist[(validIndex + 1) % playlist.length];
+
+  const currentTrack: SpotifyTrackInfo | null = isEnabled && trackData ? {
+    id: trackData.id,
+    name: trackData.name,
+    primaryArtist: trackData.primaryArtist,
+    featuredArtists: trackData.featuredArtists,
+    albumName: trackData.albumName,
+    albumArtUrl: trackData.albumArtUrl,
+    durationMs,
+  } : null;
+
+  const state: SpotifyPlayerState = {
+    currentTrack,
+    isPaused,
+    positionMs,
     deviceId: "local-device",
-    isReady: false,
-    volume: 0.5,
-    nextTrackArtUrl: null,
-  });
+    isReady: isEnabled && !!trackData,
+    volume,
+    nextTrackArtUrl: nextTrackData?.albumArtUrl || null,
+  };
 
-  // Init audio element once
-  useEffect(() => {
-    if (!isEnabled) return;
-    
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.crossOrigin = "anonymous";
-      audioRef.current = audio;
-
-      // Listeners
-      audio.addEventListener("timeupdate", () => {
-        setState(s => {
-          const currentDuration = (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) ? audio.duration * 1000 : 180000;
-          return {
-            ...s, 
-            positionMs: audio.currentTime * 1000,
-            currentTrack: s.currentTrack ? { ...s.currentTrack, durationMs: currentDuration } : null
-          };
-        });
-      });
-      
-      audio.addEventListener("ended", () => {
-        if (skipToNextRef.current) skipToNextRef.current();
-      });
-
-      audio.addEventListener("loadedmetadata", () => {
-        setState(s => {
-          if (!s.currentTrack) return s;
-          return {
-            ...s,
-            currentTrack: { ...s.currentTrack, durationMs: audio.duration * 1000 }
-          };
-        });
-      });
-
-      audio.addEventListener("play", () => setState(s => ({ ...s, isPaused: false })));
-      audio.addEventListener("pause", () => setState(s => ({ ...s, isPaused: true })));
-    }
-
-    return () => {
-      if (audioRef.current && !isEnabled) {
-        audioRef.current.pause();
-      }
-    };
-  }, [isEnabled]);
-
-  // Load track when index or mood changes
-  useEffect(() => {
-    if (!isEnabled || !audioRef.current) return;
-    
-    const trackData = playlist[currentIndex];
-    if (!trackData) return;
-
-    const trackInfo: SpotifyTrackInfo = {
-      id: trackData.id,
-      name: trackData.name,
-      primaryArtist: trackData.primaryArtist,
-      featuredArtists: trackData.featuredArtists,
-      albumName: trackData.albumName,
-      albumArtUrl: trackData.albumArtUrl,
-      durationMs: 180000, // placeholder until loadedmetadata fires
-    };
-
-    const nextTrackData = playlist[(currentIndex + 1) % playlist.length];
-
-    setState(s => ({
-      ...s,
-      currentTrack: trackInfo,
-      nextTrackArtUrl: nextTrackData?.albumArtUrl || null,
-      isReady: true,
-    }));
-
-    if (trackData.audioUrl) {
-      // If the audio was playing OR if it just naturally finished (ended is true), we want to autoplay the next track
-      const wasPlaying = (!audioRef.current.paused && audioRef.current.currentTime > 0) || audioRef.current.ended;
-      audioRef.current.src = trackData.audioUrl;
-      audioRef.current.load();
-      if (wasPlaying) {
-        audioRef.current.play().catch(console.error);
-      }
-    }
-  }, [currentIndex, mood, isEnabled]); // Re-run if mood changes to reset track
-
-  // Initialize Web Audio API on first play
-  const initWebAudio = () => {
+  // Initialize Web Audio API
+  const initWebAudio = useCallback(() => {
     if (!audioCtxRef.current && audioRef.current) {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      audioCtxRef.current = new AudioContext();
+      interface WebkitWindow extends Window {
+        webkitAudioContext?: typeof AudioContext;
+      }
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as WebkitWindow).webkitAudioContext;
+      if (!AudioContextClass) return;
+      audioCtxRef.current = new AudioContextClass();
       analyserRef.current = audioCtxRef.current.createAnalyser();
       analyserRef.current.fftSize = 4096; // 2048 bins, ~10.7Hz per bin
       
@@ -302,58 +249,158 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus" | "neutral", i
     if (audioCtxRef.current?.state === "suspended") {
       audioCtxRef.current.resume();
     }
-  };
+  }, []);
+
+  // Init audio element once
+  useEffect(() => {
+    if (!isEnabled) return;
+    
+    let audio = audioRef.current;
+    if (!audio) {
+      audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      audioRef.current = audio;
+    }
+
+    // Listeners
+    const onTimeUpdate = () => {
+      if (audio) {
+        setPositionMs((audio.currentTime || 0) * 1000);
+        if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+          setDurationMs(audio.duration * 1000);
+        }
+      }
+    };
+    
+    const onEnded = () => {
+      if (skipToNextRef.current) skipToNextRef.current();
+    };
+
+    const onLoadedMetadata = () => {
+      if (audio && audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+        setDurationMs(audio.duration * 1000);
+      }
+    };
+
+    const onPlay = () => setIsPaused(false);
+    const onPause = () => setIsPaused(true);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.removeEventListener("timeupdate", onTimeUpdate);
+        audio.removeEventListener("ended", onEnded);
+        audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+        audio.removeEventListener("play", onPlay);
+        audio.removeEventListener("pause", onPause);
+      }
+    };
+  }, [isEnabled]);
+
+  // Pause local audio immediately when switching to Spotify mode
+  useEffect(() => {
+    if (!isEnabled && audioRef.current) {
+      audioRef.current.pause();
+      setIsPaused(true);
+    }
+  }, [isEnabled]);
+
+  // Load track when index or mood changes
+  useEffect(() => {
+    if (!isEnabled || !audioRef.current) return;
+    
+    const validIdx = currentIndex < playlist.length ? currentIndex : 0;
+    const currentTrackData = playlist[validIdx];
+    if (!currentTrackData?.audioUrl) return;
+
+    const audio = audioRef.current;
+    // If the audio was playing OR if it just naturally finished (ended is true), we want to autoplay the next track
+    const wasPlaying = (!audio.paused && audio.currentTime > 0) || audio.ended;
+    if (!audio.src.endsWith(currentTrackData.audioUrl)) {
+      audio.src = currentTrackData.audioUrl;
+      audio.load();
+      if (wasPlaying) {
+        initWebAudio();
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err: Error) => {
+            if (err.name !== "AbortError") {
+              console.error("[LocalPlayer] Play failed:", err);
+            }
+          });
+        }
+      }
+    }
+  }, [currentIndex, mood, isEnabled, playlist, initWebAudio]); // Re-run if mood changes to reset track
 
   const togglePlay = useCallback(async () => {
     if (!audioRef.current) return;
     initWebAudio();
     if (audioRef.current.paused) {
-      await audioRef.current.play().catch(console.error);
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err: Error) => {
+          if (err.name !== "AbortError") {
+            console.error("[LocalPlayer] Play failed:", err);
+          }
+        });
+      }
     } else {
       audioRef.current.pause();
     }
-  }, []);
+  }, [initWebAudio]);
 
   const skipToNext = useCallback(async () => {
+    initWebAudio();
     setCurrentIndex((i) => (i + 1) % playlist.length);
-  }, [playlist.length]);
+  }, [playlist.length, initWebAudio]);
 
   useEffect(() => {
     skipToNextRef.current = skipToNext;
   }, [skipToNext]);
 
   const skipToPrevious = useCallback(async () => {
+    initWebAudio();
     if (audioRef.current && audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0;
       return;
     }
     setCurrentIndex(i => (i - 1 + playlist.length) % playlist.length);
-  }, [playlist.length]);
+  }, [playlist.length, initWebAudio]);
 
-  const seek = useCallback(async (positionMs: number) => {
+  const seek = useCallback(async (newPositionMs: number) => {
     if (audioRef.current) {
-      audioRef.current.currentTime = positionMs / 1000;
-      setState(s => ({ ...s, positionMs }));
+      audioRef.current.currentTime = newPositionMs / 1000;
+      setPositionMs(newPositionMs);
     }
   }, []);
 
-  const setVolume = useCallback(async (volume: number) => {
-    volumeRef.current = volume; // Update ref for closures
+  const setVolume = useCallback(async (newVolume: number) => {
+    volumeRef.current = newVolume; // Update ref for closures
     // We do NOT change audioRef.current.volume because we want the AnalyserNode to always receive a 1.0 full-scale signal.
     // Instead, we adjust the Web Audio GainNode which controls the speaker output after the analyzer.
     if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = volume;
+      gainNodeRef.current.gain.value = newVolume;
     } else if (audioRef.current) {
       // Fallback if Web Audio isn't initialized yet
-      audioRef.current.volume = volume;
+      audioRef.current.volume = newVolume;
     }
-    setState(s => ({ ...s, volume }));
+    setVolumeState(newVolume);
   }, []);
 
   // Expose frequency data for 3D scenes
   const getAudioData = useCallback((): AudioReactivityData | null => {
-    if (!analyserRef.current || !dataArrayRef.current || !timeDomainDataArrayRef.current) return null;
-    if (state.isPaused) return null;
+    const analyser = analyserRef.current;
+    const dataArray = dataArrayRef.current;
+    const timeDomainArray = timeDomainDataArrayRef.current;
+    if (!analyser || !dataArray || !timeDomainArray) return null;
+    if (isPaused) return null;
 
     // Prevent multiple components from double-processing the audio data in the same frame (60fps = ~16ms)
     const now = performance.now();
@@ -363,32 +410,32 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus" | "neutral", i
     lastProcessedTimeRef.current = now;
     
     // Get Frequency Data (FFT)
-    analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
+    analyser.getByteFrequencyData(dataArray as unknown as Uint8Array<ArrayBuffer>);
     
     // Get Waveform Data (Time Domain)
-    analyserRef.current.getByteTimeDomainData(timeDomainDataArrayRef.current as any);
+    analyser.getByteTimeDomainData(timeDomainArray as unknown as Uint8Array<ArrayBuffer>);
     
     // fftSize = 4096 -> 2048 bins -> ~10.7Hz per bin
     let subBassSum = 0;
-    for (let i = 2; i < 6; i++) subBassSum += dataArrayRef.current[i]; // ~20Hz to 60Hz
+    for (let i = 2; i < 6; i++) subBassSum += dataArray[i]; // ~20Hz to 60Hz
     
     let bassSum = 0;
-    for (let i = 6; i < 24; i++) bassSum += dataArrayRef.current[i]; // ~60Hz to 250Hz
+    for (let i = 6; i < 24; i++) bassSum += dataArray[i]; // ~60Hz to 250Hz
     
     let midSum = 0;
-    for (let i = 24; i < 186; i++) midSum += dataArrayRef.current[i]; // ~250Hz to 2000Hz
+    for (let i = 24; i < 186; i++) midSum += dataArray[i]; // ~250Hz to 2000Hz
     
     let highSum = 0;
-    for (let i = 186; i < 930; i++) highSum += dataArrayRef.current[i]; // ~2000Hz to 10000Hz
+    for (let i = 186; i < 930; i++) highSum += dataArray[i]; // ~2000Hz to 10000Hz
 
     // Calculate RMS (Root Mean Square) for the waveform volume
     let sumSquares = 0;
-    for (let i = 0; i < timeDomainDataArrayRef.current.length; i++) {
+    for (let i = 0; i < timeDomainArray.length; i++) {
       // Data is 0-255 centered at 128
-      const normalize = (timeDomainDataArrayRef.current[i] - 128) / 128;
+      const normalize = (timeDomainArray[i] - 128) / 128;
       sumSquares += normalize * normalize;
     }
-    const currentRms = Math.sqrt(sumSquares / timeDomainDataArrayRef.current.length);
+    const currentRms = Math.sqrt(sumSquares / timeDomainArray.length);
     
     // Detect transient impact (volume spike)
     // If the current volume is significantly higher than the previous frame, we register a hit
@@ -430,7 +477,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus" | "neutral", i
     };
     
     return cachedAudioDataRef.current;
-  }, [state.isPaused]);
+  }, [isPaused]);
 
   return {
     state,

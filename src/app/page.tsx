@@ -10,16 +10,17 @@ import {
 import { LiquidBackground } from "@/components/LiquidBackground";
 import { PlayerCard } from "@/components/PlayerCard";
 import { useActivePlayer } from "@/hooks/useActivePlayer";
+import type { SpotifyTrackInfo } from "@/hooks/useSpotifyPlayer";
 import { useImageBrightness } from "@/hooks/useImageBrightness";
 import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
 import { defaultAccessibilitySettings } from "@/contexts/AccessibilityContext";
 
 // ── Static fallback data ──
 const STATIC_IMAGES = [
-  "/images/billie_1.jpg",
-  "/images/billie7.jpg",
-  "/images/billie8.jpg",
-  "/images/billie9.jpg",
+  "/images/billie_2.jpg",
+  "/images/cover2.jpg",
+  "/images/cover3.jpg",
+  "/images/cover4.jpg",
   "/images/billie5.jpg",
 ];
 
@@ -32,7 +33,12 @@ const STATIC_TRACK_DATA = [
 ];
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Boolean(getStoredAccessToken());
+    }
+    return false;
+  });
   const [mood, setMood] = useState<"chill" | "energy" | "focus" | "neutral">("chill");
   const [boostValues, setBoostValues] = useState({ bass: 1.0, mids: 1.0, highs: 1.0 });
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -90,11 +96,6 @@ export default function Home() {
     
   const brightness = useImageBrightness(currentBgUrl);
 
-  // ── Auth check on mount ──
-  useEffect(() => {
-    const token = getStoredAccessToken();
-    if (token) setIsLoggedIn(true);
-  }, []);
 
   // ── GSAP Initial Setup ──
   useEffect(() => {
@@ -127,9 +128,9 @@ export default function Home() {
   }, [isPlayerActive, playerState.currentTrack]);
 
   // ── Core GSAP Animation Logic ──
-  const runGsapTransitionRef = useRef<((newImageUrl: string | null, newTrackData?: any) => void) | null>(null);
+  const runGsapTransitionRef = useRef<((newImageUrl: string | null, newTrackData?: SpotifyTrackInfo | null) => void) | null>(null);
 
-  runGsapTransitionRef.current = (newImageUrl: string | null, newTrackData: any = null) => {
+  const runGsapTransition = useCallback((newImageUrl: string | null, newTrackData: SpotifyTrackInfo | null = null) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
 
@@ -217,7 +218,11 @@ export default function Home() {
       );
     masterIndexRef.current = nextIndex;
     setCurrentSlideIndex(nextIndex);
-  };
+  }, [isPlayerActive]);
+
+  useEffect(() => {
+    runGsapTransitionRef.current = runGsapTransition;
+  }, [runGsapTransition]);
 
   // ── Main click handler ──
   const handleMainClick = () => {
@@ -274,19 +279,22 @@ export default function Home() {
 
   // ── Keyboard Shortcuts (Hotkeys) ──
   const controlsRef = useRef(controls);
-  controlsRef.current = controls;
   const playerStateRef = useRef(playerState);
-  playerStateRef.current = playerState;
   const lastVolumeRef = useRef(0.5);
 
   useEffect(() => {
+    controlsRef.current = controls;
+    playerStateRef.current = playerState;
+  }, [controls, playerState]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in a text field
+      // Ignore if user is typing in a text field or interacting with an input/slider
       const target = e.target as HTMLElement | null;
       if (
         target &&
         (target.tagName === "TEXTAREA" ||
-          (target.tagName === "INPUT" && (target as HTMLInputElement).type === "text") ||
+          target.tagName === "INPUT" ||
           target.isContentEditable)
       ) {
         return;
@@ -399,10 +407,10 @@ export default function Home() {
                     <span>Mood: {mood}</span>
                   </button>
                   <div className="mood-dropdown-content">
-                    <button onClick={() => setMood("chill")}>✨ Chill</button>
-                    <button onClick={() => setMood("energy")}>⚡ Energy</button>
-                    <button onClick={() => setMood("focus")}>👁️ Focus</button>
-                    <button onClick={() => setMood("neutral")}>😐 Neutral</button>
+                    <button onClick={() => setMood("chill")}>Chill</button>
+                    <button onClick={() => setMood("energy")}>Energy</button>
+                    <button onClick={() => setMood("focus")}>Focus</button>
+                    <button onClick={() => setMood("neutral")}>Neutral</button>
                   </div>
                 </div>
                 <div className="boost-dropdown" onClick={(e) => e.stopPropagation()}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { exchangeCodeForToken } from "@/lib/spotify-auth";
 
@@ -10,25 +10,28 @@ import { exchangeCodeForToken } from "@/lib/spotify-auth";
 function CallbackHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const code = searchParams.get("code");
+  const error = searchParams.get("error");
+  const initialStatus: "loading" | "error" = error || !code ? "error" : "loading";
+  const [status, setStatus] = useState<"loading" | "success" | "error">(initialStatus);
+  const exchangedRef = useRef(false);
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const error = searchParams.get("error");
+    if (exchangedRef.current) return;
 
     if (error) {
       console.error("[Spotify Callback] Auth denied:", error);
-      setStatus("error");
       setTimeout(() => router.replace("/"), 3000);
       return;
     }
 
     if (!code) {
       console.error("[Spotify Callback] No code in URL.");
-      setStatus("error");
       setTimeout(() => router.replace("/"), 3000);
       return;
     }
+
+    exchangedRef.current = true;
 
     exchangeCodeForToken(code).then((tokenData) => {
       if (tokenData) {
@@ -39,7 +42,7 @@ function CallbackHandler() {
       }
       setTimeout(() => router.replace("/"), 2000);
     });
-  }, [searchParams, router]);
+  }, [code, error, router]);
 
   return (
     <div

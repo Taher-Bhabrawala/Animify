@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
@@ -176,7 +176,7 @@ function UnifiedGeometricFrame({
   const smoothBassRef = useRef(0);
   const { update: updatePulse } = useSyntheticPulse(120);
 
-  const hasLiveAudio = playbackState && (playbackState as any).getAudioData;
+  const hasLiveAudio = playbackState && playbackState.getAudioData;
 
   const geometry = useMemo(() => {
     const hw = 0.5;
@@ -192,14 +192,20 @@ function UnifiedGeometricFrame({
     return geo;
   }, []);
 
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
   useFrame((state, delta) => {
     const line = lineRef.current;
     if (!line) return;
 
     let bassValue = 0;
     if (reactive) {
-      if (hasLiveAudio) {
-        const data = (playbackState as any).getAudioData();
+      if (hasLiveAudio && playbackState?.getAudioData) {
+        const data = playbackState.getAudioData();
         if (data) {
           bassValue = data.bass * boostValues.bass;
         }

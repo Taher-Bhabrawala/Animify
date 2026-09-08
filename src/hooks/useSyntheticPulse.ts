@@ -1,10 +1,12 @@
 import { useRef } from "react";
+import type { AudioReactivityData } from "./useLocalPlayer";
 
 export interface PlaybackState {
   positionMs: number;
   isPaused: boolean;
   volume: number;
   durationMs: number;
+  getAudioData?: () => AudioReactivityData | null;
 }
 
 export function useSyntheticPulse(bpm: number = 120) {
@@ -54,7 +56,7 @@ export function useSyntheticPulse(bpm: number = 120) {
       const beatPhase = (s.localTimeSec * beatsPerSecond) % 1.0;
 
       // Create a sharp, decaying transient mimicking a kick drum
-      let rawPulse = Math.pow(1.0 - beatPhase, 3.0);
+      const rawPulse = Math.pow(1.0 - beatPhase, 3.0);
 
       // Add "organic" noise so every beat hits slightly differently
       // We use the current beat number to seed a pseudo-random hash

@@ -149,13 +149,14 @@ export async function exchangeCodeForToken(
 
 /**
  * Returns the stored access token if it hasn't expired, otherwise `null`.
+ * Includes a 60-second safety buffer so tokens don't expire mid-request.
  */
 export function getStoredAccessToken(): string | null {
   const token = localStorage.getItem("spotify_access_token");
   const expiry = localStorage.getItem("spotify_token_expiry");
   if (!token || !expiry) return null;
-  if (Date.now() > Number(expiry)) {
-    // Token expired — clear it
+  if (Date.now() > Number(expiry) - 60000) {
+    // Token expired or within 60-second buffer — clear it
     localStorage.removeItem("spotify_access_token");
     localStorage.removeItem("spotify_token_expiry");
     return null;

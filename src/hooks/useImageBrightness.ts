@@ -88,7 +88,7 @@ export function useImageBrightness(imageUrl: string | null) {
           heroIsLight: heroLuminance > 128,
           navIsLight: navLuminance > 128,
         });
-      } catch (err) {
+      } catch {
         // CORS blocked getImageData. Fail silently.
       }
     };

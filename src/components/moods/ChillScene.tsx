@@ -39,6 +39,15 @@ const fallbackTex = (() => {
 })();
 
 // ──────────────────────────────────────────
+//  Pre-allocated scratch vectors (0 GC allocations in useFrame)
+// ──────────────────────────────────────────
+
+const scratchTargetVec2 = new THREE.Vector2();
+const defaultDirVec2 = new THREE.Vector2(0, 1);
+const defaultSparklePos = new THREE.Vector3(0, 0, 1);
+const defaultSparkleScale = new THREE.Vector3(1, 1, 1);
+
+// ──────────────────────────────────────────
 //  GLSL – Vertex Shader
 // ──────────────────────────────────────────
 
@@ -244,12 +253,9 @@ interface ChillPlaneProps {
 
 function UnifiedChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: ChillPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
-  const size = useThree((s) => s.size);
   const { update: updatePulse } = useSyntheticPulse(120);
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
-  const timeRef = useRef(Math.random() * 100);
   const subBassRef = useRef(0);
 
   // Liquid gooey glass lens simulation state
@@ -259,12 +265,10 @@ function UnifiedChillPlane({ textures, layerType, mouseTarget, zOffset, playback
   const vyRef = useRef(0);
   const stretchRef = useRef(0);
   const wobbleRef = useRef(0);
-  const wobbleVelRef = useRef(0);
   const dirRef = useRef(new THREE.Vector2(0, 1));
   
   // Mouse cursor tracking for noise-free velocity
   const smoothMouseRef = useRef(new THREE.Vector2(0.5, 0.5));
-  const smoothMouseSpeedRef = useRef(0);
 
   const uniforms = useMemo(
     () => ({
@@ -308,10 +312,10 @@ function UnifiedChillPlane({ textures, layerType, mouseTarget, zOffset, playback
     let mid = 0.0;
     let high = 0.0;
     
-    const hasLiveAudio = playbackState && (playbackState as any).getAudioData;
+    const hasLiveAudio = Boolean(playbackState?.getAudioData);
 
-    if (hasLiveAudio) {
-      const data = (playbackState as any).getAudioData();
+    if (hasLiveAudio && playbackState?.getAudioData) {
+      const data = playbackState.getAudioData();
       if (data) {
         bass = Math.pow(data.bass, 1.2) * 2.0 * boostValues.bass;
         const rawSub = Math.pow(data.subBass, 2.0) * 0.5 * boostValues.bass;
@@ -409,7 +413,8 @@ function UnifiedChillPlane({ textures, layerType, mouseTarget, zOffset, playback
     // by differentiating coordinates results in mathematical spikes (jumping between velocity and 0.0).
     // Instead of using division-based velocity, we measure the smooth lag distance of a first-order lerp filter.
     // This distance is perfectly continuous, noise-free, and decays to 0 when still with zero bouncing.
-    smoothMouseRef.current.lerp(new THREE.Vector2(tx, ty), 8.0 * dt);
+    scratchTargetVec2.set(tx, ty);
+    smoothMouseRef.current.lerp(scratchTargetVec2, 8.0 * dt);
 
     const lagDistance = Math.hypot(
       tx - smoothMouseRef.current.x,
@@ -429,7 +434,7 @@ function UnifiedChillPlane({ textures, layerType, mouseTarget, zOffset, playback
     if (springSpeed > 0.01) {
       dirRef.current.set(vxRef.current / springSpeed, vyRef.current / springSpeed);
     } else {
-      dirRef.current.lerp(new THREE.Vector2(0, 1), 5.0 * dt);
+      dirRef.current.lerp(defaultDirVec2, 5.0 * dt);
     }
 
     // Set liquid glass physics uniforms
@@ -504,10 +509,10 @@ export function ChillScene({
   const { viewport } = useThree();
   const sparklesRef = useRef<THREE.Group>(null);
   
-  useFrame((state, delta) => {
+  useFrame((state) => {
     if (sparklesRef.current && (accessibility?.sparkleEffects !== false)) {
-      if (playbackState && (playbackState as any).getAudioData) {
-        const data = (playbackState as any).getAudioData();
+      if (playbackState && playbackState.getAudioData) {
+        const data = playbackState.getAudioData();
         if (data) {
           // Remove the scale 'zooming' (which causes the back-and-forth effect)
           sparklesRef.current.scale.setScalar(1.0);
@@ -528,8 +533,8 @@ export function ChillScene({
             sparklesRef.current.scale.setScalar(scalePulse);
           } else {
             // Smoothly settle back to origin and base scale
-            sparklesRef.current.position.lerp(new THREE.Vector3(0, 0, 1), 0.1);
-            sparklesRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+            sparklesRef.current.position.lerp(defaultSparklePos, 0.1);
+            sparklesRef.current.scale.lerp(defaultSparkleScale, 0.1);
           }
         }
       }

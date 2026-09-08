@@ -46,12 +46,12 @@ export function useTrackTextures(
   const tex2Ref = useRef<THREE.Texture | null>(null);
   const tex3Ref = useRef<THREE.Texture | null>(null);
 
-  const progressRef = useRef({ value: 0.0 });
-  const hoverAmountRef = useRef({ value: 0.0 });
+  const [progress] = useState(() => ({ value: 0.0 }));
+  const [hoverAmount] = useState(() => ({ value: 0.0 }));
 
-  const imgRes1Ref = useRef(new THREE.Vector2(1, 1));
-  const imgRes2Ref = useRef(new THREE.Vector2(1, 1));
-  const imgRes3Ref = useRef(new THREE.Vector2(1, 1));
+  const [imageRes1] = useState(() => new THREE.Vector2(1, 1));
+  const [imageRes2] = useState(() => new THREE.Vector2(1, 1));
+  const [imageRes3] = useState(() => new THREE.Vector2(1, 1));
 
   // ── Load / transition the main track texture ──
   useEffect(() => {
@@ -83,24 +83,24 @@ export function useTrackTextures(
         if (!tex1Ref.current) {
           // First texture ever loaded — set directly, no transition
           tex1Ref.current = tex;
-          imgRes1Ref.current.set(w, h);
-          progressRef.current.value = 0.0;
+          imageRes1.set(w, h);
+          progress.value = 0.0;
           lastTrackUrlRef.current = currentTrackUrl;
           setTrigger(p => p + 1);
         } else {
           // Subsequent texture — run GSAP crossfade
           if (isTransitioningRef.current) {
-            gsap.killTweensOf(progressRef.current);
+            gsap.killTweensOf(progress);
           }
           isTransitioningRef.current = true;
 
           const oldTex = tex1Ref.current;
           tex2Ref.current = tex;
-          imgRes2Ref.current.set(w, h);
+          imageRes2.set(w, h);
           setTrigger(p => p + 1);
 
           gsap.fromTo(
-            progressRef.current,
+            progress,
             { value: 0.0 },
             {
               value: 1.0,
@@ -109,9 +109,9 @@ export function useTrackTextures(
               onComplete: () => {
                 if (oldTex) oldTex.dispose();
                 tex1Ref.current = tex;
-                imgRes1Ref.current.set(w, h);
+                imageRes1.set(w, h);
                 tex2Ref.current = null;
-                progressRef.current.value = 0.0;
+                progress.value = 0.0;
                 isTransitioningRef.current = false;
                 lastTrackUrlRef.current = currentTrackUrl;
                 setTrigger(p => p + 1);
@@ -129,7 +129,7 @@ export function useTrackTextures(
     return () => {
       isActive = false;
     };
-  }, [currentTrackUrl]);
+  }, [currentTrackUrl, imageRes1, imageRes2, progress]);
 
   // ── Load the hover preview texture ──
   useEffect(() => {
@@ -153,7 +153,7 @@ export function useTrackTextures(
         const old = tex3Ref.current;
         if (old) old.dispose();
         tex3Ref.current = tex;
-        imgRes3Ref.current.set(
+        imageRes3.set(
           (tex.image as HTMLImageElement)?.width || 1024,
           (tex.image as HTMLImageElement)?.height || 1024
         );
@@ -162,25 +162,25 @@ export function useTrackTextures(
       undefined,
       (err: unknown) => console.error("useTrackTextures: Error loading hover texture:", err)
     );
-  }, [hoverTrackUrl]);
+  }, [hoverTrackUrl, imageRes3]);
 
   // ── Animate hover amount ──
   useEffect(() => {
     if (hoverActive && hoverTrackUrl) {
-      gsap.to(hoverAmountRef.current, { value: 1.0, duration: 0.8, ease: "power2.out" });
+      gsap.to(hoverAmount, { value: 1.0, duration: 0.8, ease: "power2.out" });
     } else {
-      gsap.to(hoverAmountRef.current, { value: 0.0, duration: 0.6, ease: "power2.in" });
+      gsap.to(hoverAmount, { value: 0.0, duration: 0.6, ease: "power2.in" });
     }
-  }, [hoverActive, hoverTrackUrl]);
+  }, [hoverActive, hoverTrackUrl, hoverAmount]);
 
   return {
     texture1Ref: tex1Ref,
     texture2Ref: tex2Ref,
     hoverTextureRef: tex3Ref,
-    progress: progressRef.current,
-    hoverAmount: hoverAmountRef.current,
-    imageRes1: imgRes1Ref.current,
-    imageRes2: imgRes2Ref.current,
-    imageRes3: imgRes3Ref.current,
+    progress,
+    hoverAmount,
+    imageRes1,
+    imageRes2,
+    imageRes3,
   };
 }

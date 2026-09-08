@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { SynthesizedAudioData } from './useAudioSynthesizer';
 
 interface UseChillSynthesizerProps {
@@ -7,8 +7,8 @@ interface UseChillSynthesizerProps {
 
 export function useChillSynthesizer({
   isPlaying,
-}: UseChillSynthesizerProps): SynthesizedAudioData {
-  const [audioData, setAudioData] = useState<SynthesizedAudioData>({
+}: UseChillSynthesizerProps): () => SynthesizedAudioData | null {
+  const audioDataRef = useRef<SynthesizedAudioData>({
     subBass: 0,
     bass: 0,
     mid: 0,
@@ -24,10 +24,15 @@ export function useChillSynthesizer({
 
   useEffect(() => {
     if (!isPlaying) {
-      setAudioData({ subBass: 0, bass: 0, mid: 0, high: 0, impact: 0 });
+      audioDataRef.current = { subBass: 0, bass: 0, mid: 0, high: 0, impact: 0 };
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+        requestRef.current = 0;
       }
+      lastTriggerMsRef.current = 0;
+      nextTriggerMsRef.current = 0;
+      lastBassTriggerMsRef.current = 0;
+      nextBassTriggerMsRef.current = 0;
       return;
     }
 
@@ -87,13 +92,13 @@ export function useChillSynthesizer({
       // Mild organic jitter
       const jitter = (val: number) => val + (Math.random() * 0.02 - 0.01);
 
-      setAudioData({
+      audioDataRef.current = {
         subBass: Math.min(1, Math.max(0, jitter(subBass))),
         bass: Math.min(1, Math.max(0, jitter(bass))),
         mid: Math.min(1, Math.max(0, jitter(mid))),
         high: Math.min(1, Math.max(0, jitter(high))),
         impact: isImpact ? 1 : 0,
-      });
+      };
 
       requestRef.current = requestAnimationFrame(animate);
     };
@@ -107,5 +112,10 @@ export function useChillSynthesizer({
     };
   }, [isPlaying]);
 
-  return audioData;
+  const getAudioData = useCallback((): SynthesizedAudioData | null => {
+    if (!isPlaying) return null;
+    return audioDataRef.current;
+  }, [isPlaying]);
+
+  return getAudioData;
 }

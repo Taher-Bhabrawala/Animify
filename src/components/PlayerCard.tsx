@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import type { SpotifyPlayerState, SpotifyPlayerControls } from "@/hooks/useSpotifyPlayer";
 
 export function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -7,14 +8,21 @@ export function formatMs(ms: number): string {
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
+export interface StaticTrackItem {
+  title: string;
+  artist: string;
+  duration: string;
+  time: string;
+  progress: string;
+}
+
 interface PlayerCardProps {
-  playerState: any;
-  controls: any;
+  playerState: SpotifyPlayerState;
+  controls: SpotifyPlayerControls;
   isPlayerActive: boolean;
   isLocal: boolean;
   currentSlideIndex: number;
-
-  staticTrackData: any[];
+  staticTrackData: StaticTrackItem[];
   backgroundUrl: string;
 }
 
@@ -85,11 +93,11 @@ export function PlayerCard({
       <p>{nowPlayingLabel}</p>
 
       <div className="imagediv">
-        <img src="/images/cover1.jpg" className="album-card" alt="Deck Card 1" />
+        <img src="/images/billie_2.jpg" className="album-card" alt="Deck Card 1" />
         <img src="/images/cover2.jpg" className="album-card" alt="Deck Card 2" />
         <img src="/images/cover3.jpg" className="album-card" alt="Deck Card 3" />
         <img src="/images/cover4.jpg" className="album-card" alt="Deck Card 4" />
-        <img src="/images/cover5.jpg" className="album-card" alt="Deck Card 5" />
+        <img src="/images/billie5.jpg" className="album-card" alt="Deck Card 5" />
       </div>
 
       <div className="player-meta">

@@ -113,14 +113,14 @@ interface KineticPlaneProps {
 // COMPONENT 1: Synthetic Kinetic Plane (Used for Spotify Mode)
 // ──────────────────────────────────────────
 
-function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: KineticPlaneProps) {
+function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
-  const timeRef = useRef(Math.random() * 100);
+  const timeRef = useRef(0);
   const movementLerpRef = useRef(1.0);
   const { update: updatePulse } = useSyntheticPulse(120);
 
@@ -215,7 +215,7 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
-  const timeRef = useRef(Math.random() * 100);
+  const timeRef = useRef(0);
   const movementLerpRef = useRef(1.0);
 
   // Transient Kick Detector State
@@ -273,8 +273,8 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     let currentMid = 0;
     let currentImpact = 0;
 
-    if (playbackState && (playbackState as any).getAudioData) {
-      const data = (playbackState as any).getAudioData();
+    if (playbackState && playbackState.getAudioData) {
+      const data = playbackState.getAudioData();
       if (data) {
         currentSubBass = data.subBass * boostValues.bass;
         currentBass = data.bass * boostValues.bass;
@@ -422,7 +422,7 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 // ──────────────────────────────────────────
 
 export function EnergyScene(props: EnergySceneProps) {
-  const hasLiveAudio = props.playbackState && (props.playbackState as any).getAudioData;
+  const hasLiveAudio = props.playbackState && props.playbackState.getAudioData;
 
   return (
     <>

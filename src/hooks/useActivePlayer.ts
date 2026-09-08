@@ -19,20 +19,24 @@ export function useActivePlayer(
   const spotify = useSpotifyPlayer(isLoggedIn);
   const local = useLocalPlayer(mood, !isLoggedIn);
 
-  // Run the standard heavy synth only for Energy/Focus
-  const baseSynthData = useAudioSynthesizer({
-    isPlaying: isLoggedIn && !spotify.state.isPaused && mood !== "chill",
+  const isNeutral = mood === "neutral";
+
+  // Run the standard heavy synth only for Energy/Focus (disabled for Neutral and Chill)
+  const getBaseSynthData = useAudioSynthesizer({
+    isPlaying: isLoggedIn && !spotify.state.isPaused && !isNeutral && mood !== "chill",
     progressMs: spotify.state.positionMs,
   });
 
-  // Run the sparse, random synth only for Chill
-  const chillSynthData = useChillSynthesizer({
-    isPlaying: isLoggedIn && !spotify.state.isPaused && mood === "chill",
+  // Run the sparse, random synth only for Chill (disabled for Neutral)
+  const getChillSynthData = useChillSynthesizer({
+    isPlaying: isLoggedIn && !spotify.state.isPaused && !isNeutral && mood === "chill",
   });
 
-  // Dynamically pass the correct audio data to the visualizers
-  const activeSynthData = mood === "chill" ? chillSynthData : baseSynthData;
-  const getSpotifyAudioData = useCallback(() => activeSynthData, [activeSynthData]);
+  // Dynamically pass the correct audio getter to the visualizers
+  const getSpotifyAudioData = useCallback((): AudioReactivityData | null => {
+    if (isNeutral) return null;
+    return mood === "chill" ? getChillSynthData() : getBaseSynthData();
+  }, [mood, isNeutral, getChillSynthData, getBaseSynthData]);
 
   if (isLoggedIn) {
     return {

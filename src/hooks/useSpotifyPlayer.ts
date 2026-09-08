@@ -90,18 +90,19 @@ export function useSpotifyPlayer(isActive: boolean): {
 
   // Extract track info from the SDK state object
   const extractTrackInfo = useCallback(
-    (track: Spotify.Track): SpotifyTrackInfo => {
-      const images = track.album.images;
+    (track: Spotify.Track | null | undefined): SpotifyTrackInfo | null => {
+      if (!track) return null;
+      const images = track.album?.images || [];
       // Pick the largest image (first in array is usually largest)
       const artUrl = images.length > 0 ? images[0].url : "";
       return {
         id: track.id,
-        name: track.name.replace(/\s*(?:\(|\[|-)?\s*(?:feat\.?|featuring|with)\s+.*?(?:\)|\])?$/i, "").trim(),
-        primaryArtist: track.artists.length > 0 ? track.artists[0].name : "Unknown Artist",
-        featuredArtists: track.artists.length > 1 ? track.artists.slice(1).map(a => a.name) : [],
-        albumName: track.album.name,
+        name: track.name ? track.name.replace(/\s*(?:\(|\[|-)?\s*(?:feat\.?|featuring|with)\s+.*?(?:\)|\])?$/i, "").trim() : "Unknown",
+        primaryArtist: track.artists && track.artists.length > 0 ? track.artists[0].name : "Unknown Artist",
+        featuredArtists: track.artists && track.artists.length > 1 ? track.artists.slice(1).map(a => a.name) : [],
+        albumName: track.album?.name || "Unknown Album",
         albumArtUrl: artUrl,
-        durationMs: track.duration_ms,
+        durationMs: track.duration_ms || 0,
       };
     },
     []
@@ -190,13 +191,13 @@ export function useSpotifyPlayer(isActive: boolean): {
           return;
         }
 
-        const trackInfo = extractTrackInfo(playerState.track_window.current_track);
+        const trackInfo = extractTrackInfo(playerState.track_window?.current_track);
         
         // Find the next track's art url
-        const nextTracks = playerState.track_window.next_tracks;
+        const nextTracks = playerState.track_window?.next_tracks;
         let nextArtUrl = null;
         if (nextTracks && nextTracks.length > 0) {
-          const imgs = nextTracks[0].album.images;
+          const imgs = nextTracks[0]?.album?.images;
           if (imgs && imgs.length > 0) {
             nextArtUrl = imgs[0].url;
           }
@@ -279,7 +280,7 @@ export function useSpotifyPlayer(isActive: boolean): {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [state.isPaused, state.currentTrack?.id]);
+  }, [state.isPaused, state.currentTrack]);
 
   return {
     state,

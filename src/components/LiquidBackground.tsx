@@ -9,6 +9,7 @@ import { EnergyScene } from "./moods/EnergyScene";
 import { FocusScene } from "./moods/FocusScene";
 import { NeutralScene } from "./moods/NeutralScene";
 import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
+import type { PlaybackState } from "@/hooks/useSyntheticPulse";
 
 // ──────────────────────────────────────────
 //  R3F Scene Component Orchestrator
@@ -20,7 +21,7 @@ interface LiquidBackgroundSceneProps {
   mood: "chill" | "energy" | "focus" | "neutral";
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
-  playbackState: any;
+  playbackState?: PlaybackState | null;
   boostValues: { bass: number; mids: number; highs: number };
   accessibility?: AccessibilitySettings;
 }
@@ -64,7 +65,7 @@ interface LiquidBackgroundProps {
   currentTrackUrl: string;
   hoverTrackUrl: string | null;
   mood: "chill" | "energy" | "focus" | "neutral";
-  playbackState?: any;
+  playbackState?: PlaybackState | null;
   boostValues: { bass: number; mids: number; highs: number };
   accessibility?: AccessibilitySettings;
 }
