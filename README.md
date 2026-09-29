@@ -2,7 +2,7 @@
 
 Animify is a web-player featuring true audio reactive multi-mood visualizers via Web Audio API in local mode. Users can also connect Spotify (requires premium), to playback music while retaining all the visualizers and moods backed by a fake synthesizer. It also features a dynamic contrast changing UI and accessibility settings. This project was built using Antigravity. This was my project which got me into coding, and helped me understand browsers, JSX, and I am really excited to share this project with you all. I have learned a lot about coding in general, even though most of the code is AI written.
 
-[Live Demo]
+[Live Demo] https://animify-draing.vercel.app/
 [LinkedIn Post]
 
 ## Features
